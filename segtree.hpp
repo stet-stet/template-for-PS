@@ -16,6 +16,7 @@ constexpr size_t powerOfTwoGreaterOrEqualTo(size_t N){
     return ret;
 }
 
+//TODO: make a factory function for this class.
 template<typename T,size_t N,typename Reducer>
 class SegTree{
     /*
@@ -60,8 +61,8 @@ public:
     // TODO: make the compiler spew "appropriate" compile-time errors if reducer does not
     //  take two Ts and returns another T.
     template<typename C> 
-    SegTree(const C& _container,Reducer _reducer)
-     : container(2*arraysize), reducer {_reducer}
+    SegTree(const C& _container,Reducer _reducer, T _fallback)
+     : container(2*arraysize), reducer {_reducer}, fallbackValue{_fallback}
     {
         size_t i=0;
         for(auto x: _container){
@@ -77,6 +78,7 @@ public:
         container[idx] = value; idx/=2;
         while(idx>0){
             container[idx] = reducer(container[2*idx],container[2*idx+1]);
+            idx/=2;
         }
     }
 
@@ -90,8 +92,8 @@ public:
 
     ref operator[](size_t index){
         return ref(
-                [&](const T& val){update(index,val); }, //toCall
-                [&](){return getValue(index);} //getValue
+                [this,index](const T& val){update(index,val); }, //toCall
+                [this,index](){return getValue(index);} //getValue
                 );
     }
 };
