@@ -38,7 +38,8 @@ Interface to users is provided through several factory functions - **users may c
 - `newLazyPropSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue)`
 - `newPersistentSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
 - `newLazyPropPersistentSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
-the `defaultValue` argument is optional - if this argument is present, the factory function yields a dynamic segment tree. (do note that whether or not a SegTree is dynamic should have no effect on its behavior; perhaps except for its memory allocation behavior.)
+
+the `defaultValue` argument is optional for the first two - if this argument is present, the factory function yields a dynamic segment tree. (do note that whether or not a SegTree is dynamic should have no effect on its behavior; perhaps except for its memory allocation behavior.)
 
 ### `class StetSegTree`
 
