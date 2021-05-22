@@ -2,14 +2,15 @@
 a template I shall use for PS competitions (when I am allowed to do so)
 
 
-* Aim: easy to learn
-* Aim: easy to use
+* Aim: leaves less space for memory-related mistakes
+* Aim: easy to use (once you know what data structures the classes implement)
 * Aim: flexible
 * Aim: Practice c++17 features
 
 ## TODO
 
 * Support for operations on Z_p
+* Implement some boilerplates (like findAll(std::string from, std::string to) )
 * Make a bunch of segtrees
   * Vanilla
   * With lazyprop
@@ -17,3 +18,14 @@ a template I shall use for PS competitions (when I am allowed to do so)
 * Make a `bigint` class
 * Make a `bigbigint` class
 * Make some templates for using STL (priority_queue)
+
+# Simple Documentation
+
+## stetsegtree.hpp
+
+This is a header-only library that implements an arbitrary-type Dynamic/LazyProp/Persistent Segment tree.
+
+### class StetSegtree
+
+This class implements an arbitrary-type Dynamic/LazyProp/Persistent Segment tree.
+Interface to users is provided through several factory functions - **users may choose to use the type of segtree they wish to, but it is always a variation of this class that is provided.** This design was chosen to maximize maintainability.
