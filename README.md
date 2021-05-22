@@ -31,7 +31,7 @@ Interface to users is provided through several factory functions - **users may c
 
 ## factory functions
 
-**guideline: All instantiations of class StetSegTree should happen through these factory functions.** (If you would like to *mentally torture yourself* by disobeying this guideline, you are (of course) welcome to do so)
+**guideline: All instantiations of `class StetSegTree` should happen through these factory functions.** (If you would like to *mentally torture yourself* by disobeying this guideline, you are (of course) welcome to do so)
 - `newSegTree(T&& initValues, size_t sz, Compare reducer)`
 - `newSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue)`
 - `newLazyPropSegTree(T&& initValues, size_t sz, Compare reducer)`
@@ -40,7 +40,7 @@ Interface to users is provided through several factory functions - **users may c
 - `newLazyPropPersistentSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
 the `defaultValue` argument is optional - if this argument is present, the factory function yields a dynamic segment tree. (do note that whether or not a SegTree is dynamic should have no effect on its behavior; perhaps except for its memory allocation behavior.)
 
-### class StetSegTree
+### `class StetSegTree`
 
 **TEMPLATE ARGUMENTS** listed for sake of explanation
 - typename `T` : elements' type
