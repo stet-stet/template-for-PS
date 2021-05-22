@@ -32,12 +32,12 @@ Interface to users is provided through several factory functions - **users may c
 ## factory functions
 
 **guideline: All instantiations of `class StetSegTree` should happen through these factory functions.** (If you would like to *mentally torture yourself* by disobeying this guideline, you are (of course) welcome to do so)
-- `newSegTree(T&& initValues, size_t sz, Compare reducer)`
-- `newSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue)`
-- `newLazyPropSegTree(T&& initValues, size_t sz, Compare reducer)`
-- `newLazyPropSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue)`
-- `newPersistentSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
-- `newLazyPropPersistentSegTree(T&& initValues, size_t sz, Compare reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
+- `newSegTree(T&& initValues, size_t sz, Reducer reducer)`
+- `newSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue)`
+- `newLazyPropSegTree(T&& initValues, size_t sz, Reducer reducer)`
+- `newLazyPropSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue)`
+- `newPersistentSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
+- `newLazyPropPersistentSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
 
 the `defaultValue` argument is optional for the first two - if this argument is present, the factory function yields a dynamic segment tree. (do note that whether or not a SegTree is dynamic should have no effect on its behavior; perhaps except for its memory allocation behavior.)
 
@@ -45,7 +45,7 @@ the `defaultValue` argument is optional for the first two - if this argument is 
 
 **TEMPLATE ARGUMENTS** listed for sake of explanation
 - typename `T` : elements' type
-- typename `Compare` : type of `reducer`; Callable, takes two arguments related to T, returns T 
+- typename `Reducer` : type of `reducer`; Callable, takes two arguments related to T, returns T 
 - typename `CheckpointType` : type of `checkpoint` names.
 - typename `Lazy`: if this is `LazyType` we enable some set of functions
 - typename `PersistentType`: if type is `PersistentType` we enable some set of functions/classes
