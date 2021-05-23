@@ -51,6 +51,7 @@ Interface to users is provided through several factory functions - **users may c
 - "Observation" := access to `node.val`.
 - When observed, `node.val == reducer(node.left->val,node.right->val)`
 - When observed, `node.val` should have the value it should have. i.e. all operations should have been applied to the observed value in the order they were enqueued.
+- When `node.val` must be modified but `node.version` is different to its parent's, a new node shall be made.
 
 **TYPEDEFS and CONSTANTS**
 - `using Interval = std::pair<size_t,size_t>`
@@ -62,32 +63,21 @@ Interface to users is provided through several factory functions - **users may c
 - assignment to a single element (s.t. StetSegTree class invariant is preserved)
 - maybe other operators, if T has any other
 
-**`class TreeView`**
-- a read-only view into the tree.
-
 **`StetSegTree::ref operator[](size_t)`**
 - example usage: `tree[i] = 3` (this will preserve class invariant and make life easier)
 
-**`T reduce(Interval)`**
+**`T reduce(Interval, CheckpointType)`**
 - example usage: `tree.reduce({3,9})`
 - if Interval goes out of bounds, std::out_of_range is thrown
 
-**`void updateInterval(Interval, *a callable* )`**
+**`void updateInterval(Interval, OperationIDType)`**
 - enabled iff
-- example usage: `tree.updateInterval({1,5},[](Interval iv,T val){return val>3?val:3;});`
-- the callable takes: an `Interval`, a `T`, and returns another `T`
-  - implements group update, as in lazy propagation
-  - look at the interval a node is in charge of, the node's current `val`, and then determine the new `val` for the node.
-  - such feat should be possible: if not lazyprop is impossible to do efficiently anyways
-- how to check if this is a callable that does that?
+- example usage: `tree.updateInterval({1,5}, -3 );
 
 **`void makeCheckpoint(CheckpointType checkpointName)`**
-- enabled iff `` 
 - Archives current tree
 - saves state by the "name" `checkpointName`
 - saved state is reaccessible by this name
 - another `makeCheckpoint` call with the same name will cause states to be overwritten
+  - not recommended, as doing so will lead to a memory leak.
 
-**`TreeView loadCheckpoint(CheckpointType checkpointName)`**
-- "loads" Tree state
-- `TreeView` only has one method: `reduce` - which is quite the same as above.
