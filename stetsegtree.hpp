@@ -28,6 +28,15 @@ Interval leftHalf(Interval a){
 Interval rightHalf(Interval a){
     return {(a.second+a.first)/2+1,a.second};
 }
+Interval rgeq(Interval a,Interval b){
+    return b.first<=a.first && a.second<=b.second;
+}
+Interval intersection(Interval a,Interval b){
+    if(noOverlap(a,b)) return {-1,-1};
+    else if(rgeq(a,b)) return a;
+    else if(rgeq(b,a)) return b;
+    else return {std::max(a.first,b.first),std::min(a.second,b.second)};
+}
 
 template<
     typename T,
@@ -53,9 +62,10 @@ class StetSegTree{
         T val;
         size_t leftidx  = -1;
         size_t rightidx = -1;
-        size_t parent
+        size_t parent;
         OperationIDType pending;
-        Node(Interval _i,T _val, size_t _parent)
+        CheckpointType version;
+        Node(Interval _i,T _val, size_t _parent,CheckpointType version)
             : interval{_i},val{_val},parent{_parent},pending{} 
         {}
     }; //struct Node
@@ -87,15 +97,15 @@ class StetSegTree{
         Interval interval {0, treeSize-1};
         std::queue<size_t> Q;
 
-        nodes.emplace_back(interval, T(), 0); Q.push(0);
+        nodes.emplace_back(interval, T(), 0, currentCheckpoint); Q.push(0);
         checkpoints[currentCheckpoint] = &nodes[0];
         while(!Q.empty()){
             size_t b = Q.front(); Q.pop();
             if(nodes[b].interval.first == nodes[b].interval.second) continue;
-            nodes.emplace_back(leftHalf(nodes[b].interval), T(), b);
+            nodes.emplace_back(leftHalf(nodes[b].interval), T(), b, currentCheckpoint);
             nodes[b].leftidx = nodes.size()-1;
             Q.push( nodes.size() - 1);
-            nodes.emplace_back(rightHalf(nodes[b].interval), T(), b);
+            nodes.emplace_back(rightHalf(nodes[b].interval), T(), b, currentCheckpoint);
             nodes[b].rightidx = nodes.size()-1;
             Q.push( nodes.size() - 1);
         }
@@ -131,8 +141,8 @@ class StetSegTree{
         if( OperationIDType() == x.val ) return;
         x.val = operation(x.Interval, x.val, x.pending);
         if( x.interval.left == x.interval.right ) return;
-        nodes[x.right].pending = composer(x.pending, nodes[x.right].pending);
-        nodes[x.left].pending = composer(x.pending, nodes[x.left].pending);
+        nodes[ getRight(NodeIndex) ].pending = composer(x.pending, nodes[ getRight(NodeIndex) ].pending);
+        nodes[ getLeft(NodeIndex) ].pending = composer(x.pending, nodes[ getLeft(NodeIndex) ].pending);
         x.pending = OperationIDType();
     }
     void propagateDownTo(size_t NodeIndex){
@@ -147,7 +157,32 @@ class StetSegTree{
         }
     }
 
+    size_t getLeft(size_t NodeIndex){
+        if(nodes[NodeIndex].version == nodes[ nodes[NodeIndex].leftidx ].version){
+            return nodes[NodeIndex].leftidx;
+        }
+        else{
+            propagate(NodeIndex);
+            nodes.push_back( nodes[ nodes[NodeIndex].leftidx ]);
+            nodes.back().version = currentCheckpoint;
+            return nodes.size()-1;
+        }
+    }
+    size_t getRight(size_t NodeIndex){
+        if(nodes[NodeIndex].version == nodes[ nodes[NodeIndex].rightidx ].version){
+            return nodes[NodeIndex].rightidx;
+        }
+        else{
+            propagate(NodeIndex);
+            nodes.puah_back( nodes[ nodes[NodeIndex].rightidx ]);
+            nodes.back().version = currentCheckpoint;
+            return nodes.size()-1;
+        }
+    }
+
     T getValue(size_t NodeIndex){
+        // we don't make new nodes here, if
+        // initiator of all propagations are of the same version as their children.
         propagateDownTo(NodeIndex); return nodes[NodeIndex].val;
     }
 
@@ -168,7 +203,7 @@ class StetSegTree{
                 );
     }
 
-    T reduce(Interval target, CheckpointType chk){
+    T reduce(Interval target, CheckpointType chk=currentCheckpoint){
         std::queue<size_t> Q; Q.push( getRootIndex(chk) );
         bool untarnished = true;
         T ret;
@@ -181,19 +216,50 @@ class StetSegTree{
             }
             else{ //overlapped, but not quite "in" there.
                 if( ! noOverlap( leftHalf(nodes[nowIndex]),target ) ){
-                    Q.push( nodes[nowIndex].leftidx );
+                    Q.push( nowIndex.leftidx );
                 }
                 if( ! noOverlap( rightHalf(nodes[nowIndex]),target ) ){
-                    Q.push( nodes[nowIndex].rightidx );
+                    Q.push( nowIndex.rightidx );
                 }
             }
         }
         return ret;
     }
 
-    void updateInterval(Interval target,std::function<T(Interval,const T&,operationIDType)> op){
+    void updateInterval(Interval target, const operationIDType& op){
+        std::queue<size_t> Q; Q.push( getRootIndex() );
+        while(!Q.empty()){
+            size_t nowIndex = Q.front(); Q.pop();
+            propagate(nowIndex);
+            if( rgeq(nodes[nowIndex].interval,target) ){
+                nodes[nowIndex].pending = composer(op, nodes[nowIndex].pending);
+            }
+            else{ //overlapped, but not quite "in" there.
+                nodes[nowIndex].val = operation(
+                        intersection(leftHalf(nodes[nowIndex]), target),
+                        nodes[nowIndex].val,
+                        op
+                        );
+                if( ! noOverlap( leftHalf(nodes[nowIndex]),target ) ){
+                    Q.push( getLeft(nowIndex) );
+                }
+                if( ! noOverlap( rightHalf(nodes[nowIndex]),target) ){
+                    Q.push( getRight(nowIndex) );
+                }
+            }
+        }
     }
-}
+
+    void makeCheckpoint(CheckpointType checkpointName){
+        size_t oldRootIndex = getRootIndex(); propagate(oldRootIndex);
+        nodes.push_back(nodes[oldRootIndex]);
+
+        currentCheckpoint = checkpointName;
+        checkpoints[checkpointName] = &nodes[nodes.size()-1];
+        
+        nodes.back().version = currentCheckpoint;
+    }
+}; // template class StetSegTree
 
 
 }//namespace StetAlgo
