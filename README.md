@@ -24,35 +24,33 @@ a template I shall use for PS competitions (when I am allowed to do so)
 
 ## stetsegtree.hpp
 
-This is a header-only library that implements an arbitrary-type Dynamic/LazyProp/Persistent Segment tree. 
+This is a header-only library that implements an arbitrary-type LazyProp/Persistent Segment tree. 
 
-This class implements an arbitrary-type Dynamic/LazyProp/Persistent Segment tree.
-Interface to users is provided through several factory functions - **users may choose to use the type of segtree they wish to, but it is always a variation of this class that is provided.** This design was chosen to maximize maintainability.(Else, I would be writing the same class eight times.)
+Interface to users is provided through several factory functions - **users may choose to use the type of segtree they wish to, but it is always a slight variation of the same class that is provided.** This design was chosen to maximize maintainability.(Else, I would be writing the same class eight times.)
 
 ## factory functions
 
 **guideline: All instantiations of `class StetSegTree` should happen through these factory functions.** (If you would like to *mentally torture yourself* by disobeying this guideline, you are (of course) welcome to do so)
 - `newSegTree(T&& initValues, size_t sz, Reducer reducer)`
-- `newSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue)`
 - `newLazyPropSegTree(T&& initValues, size_t sz, Reducer reducer)`
-- `newLazyPropSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue)`
 - `newPersistentSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
 - `newLazyPropPersistentSegTree(T&& initValues, size_t sz, Reducer reducer, T defaultValue, CheckpointType initCheckpoint=(size_t)0)`
-
-the `defaultValue` argument is optional for the first two - if this argument is present, the factory function yields a dynamic segment tree. (do note that whether or not a SegTree is dynamic should have no effect on its behavior; perhaps except for its memory allocation behavior.)
 
 ### `class StetSegTree`
 
 **TEMPLATE ARGUMENTS** listed for sake of explanation
 - typename `T` : elements' type
-- typename `Reducer` : type of `reducer`; Callable, takes two arguments related to T, returns T 
-- typename `CheckpointType` : type of `checkpoint` names.
-- typename `Lazy`: if this is `LazyType` we enable some set of functions
-- typename `PersistentType`: if type is `PersistentType` we enable some set of functions/classes
+- typename `ReducerType` : type of `reducer`; Callable, takes two arguments related to T, returns T 
+- typename `OperationIDType` : Did you know that the space of maps we consider when implementing LazyProp is approximately isomorphic to an infinite abelian group? This Type should be the element of that group. Defaults to `size_t`. (in other words, `\mathbb{Z}`.
+- `std::function<T(const Interval& const T& origVal, const OperationIDType&)> operation` : Users must dictate how operations on intervals behave, given the interval size, original value on node, and the `OperationID`. (See examples below for detail)
+- `std::function<OperationIDType(const OperationIDType&, const OperationIDType&)>` : Users must dictate a policy on how operations on intervals are concatenated.
+- typename `CheckpointType` : type of `checkpoint` names. Defaults to `size_t`
+
 
 **CLASS INVARIANTS**
+- "Observation" := access to `node.val`.
 - When observed, `node.val == reducer(node.left->val,node.right->val)`
-- When observed, `node.val` should have the value it should have.
+- When observed, `node.val` should have the value it should have. i.e. all operations should have been applied to the observed value in the order they were enqueued.
 
 **TYPEDEFS and CONSTANTS**
 - `using Interval = std::pair<size_t,size_t>`
