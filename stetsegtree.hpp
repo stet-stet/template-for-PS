@@ -1,13 +1,20 @@
 #ifndef STETSEGTREE_H_
 #define STETSEGTREE_H_
-
+#include<memory>
 #include<vector>
+#include<queue>
+#include<map>
 #include<functional>
+#include<iostream>
+using std::vector;
+using std::cout;
+using std::endl;
+
 
 namespace StetAlgo{
 
 // refactor these away later on, if possible!
-using Interval = std::pair<size_t,size_t>
+using Interval = std::pair<size_t,size_t>;
 
 constexpr size_t powerOfTwoGreaterOrEqualTo(size_t N){
     --N;
@@ -38,10 +45,10 @@ Interval intersection(Interval a,Interval b){
 template<
     typename T,
     typename ReducerType,
-    typename OperationIDType=size_t,
+    typename OperationIDType,
     typename OperationType,
-    typename ComposerType,
-    typename CheckpointType =size_t
+    typename OperationComposerType,
+    typename CheckpointType
     >
 class StetSegTree{
     class ref{
@@ -49,7 +56,8 @@ class StetSegTree{
         std::function<void(const T&)> updateValue;
         public:
         ref(std::function<T()> _getValue,std::function<void(const T&)> _updateValue)
-            : getValue{_getValue}, updateValue{_updateValue}
+            : getValue{_getValue}, updateValue{_updateValue} 
+        {}
         operator T(){ return getValue(); }
         void operator=(const T& other){ updateValue(other); }
     }; // class StetSegTree::ref
@@ -76,13 +84,13 @@ class StetSegTree{
     // Interval, T, OperationIDType -> T
     OperationType operation;
     // OperationIDType, OperationIDType -> OperationIDType
-    ComposerType composer;
+    OperationComposerType composer;
     // PERSISTENCY
     vector<Node> nodes;
-    map<CheckpointType,std::shared_ptr<Node> > checkpoints;
+    std::map<CheckpointType,Node*> checkpoints;
     CheckpointType currentCheckpoint;
 
-
+public:
     StetSegTree(const vector<T>& _V, size_t _treeSize, size_t defaultValue,
                 const ReducerType& _reducer,
                 const OperationType& _operation,
@@ -92,7 +100,7 @@ class StetSegTree{
           reducer{_reducer},
           operation{_operation},
           composer{_composer},
-          currentCheckpoint{_initCheckpoint},
+          currentCheckpoint{_initCheckpoint}
     {
         //DYNAMIC - create nodes and paths to existing variables
         Interval interval {0, treeSize-1};
@@ -110,28 +118,31 @@ class StetSegTree{
             nodes[b].rightidx = nodes.size()-1;
             Q.push( nodes.size() - 1);
         }
-        for(size_t i=nodes.size()-1;i>=0;--i){
-            Node& x = nodes[i];
+        for(auto rit=nodes.rbegin();rit!=nodes.rend();++rit){
+            Node& x = (*rit);
             if(x.interval.first == x.interval.second){
-                size_t& a = x.interval.first;
+                size_t a = x.interval.first;
                 if( a < _V.size() ){
                     x.val = _V[a];
                 } else{
-                    x.val = defaultVale;
+                    x.val = defaultValue;
                 }
             }
             else x.val = reducer(nodes[x.leftidx].val,nodes[x.rightidx].val);
         }
     }//Constructor
-    size_t getRootIndex(CheckpointType chk=currentCheckpoint){
+    size_t getRootIndex(CheckpointType chk){
         return checkpoints[chk]->parent; // parent of root is itself
+    }
+    size_t getRootIndex(){
+        return checkpoints[currentCheckpoint]->parent;
     }
 
     void propagate(size_t NodeIndex){
         Node& x = nodes[NodeIndex];
-        if( OperationIDType() == x.val ) return;
-        x.val = operation(x.Interval, x.val, x.pending);
-        if( x.interval.left == x.interval.right ) return;
+        if( OperationIDType() == x.pending ) return;
+        x.val = operation(x.interval, x.val, x.pending);
+        if( x.interval.first == x.interval.second ) return;
         nodes[ getRight(NodeIndex) ].pending = composer(x.pending, nodes[ getRight(NodeIndex) ].pending);
         nodes[ getLeft(NodeIndex) ].pending = composer(x.pending, nodes[ getLeft(NodeIndex) ].pending);
         x.pending = OperationIDType();
@@ -154,14 +165,14 @@ class StetSegTree{
         }
         else{
             propagate(NodeIndex);
-            nodes.puah_back( nodes[ nodes[NodeIndex].rightidx ]);
+            nodes.push_back( nodes[ nodes[NodeIndex].rightidx ]);
             nodes.back().version = currentCheckpoint;
             return nodes.size()-1;
         }
     }
 
 
-    T reduce(Interval target, CheckpointType chk=currentCheckpoint){
+    T reduce(Interval target, CheckpointType chk){
         std::queue<size_t> Q; Q.push( getRootIndex(chk) );
         bool untarnished = true;
         T ret;
@@ -169,23 +180,26 @@ class StetSegTree{
             size_t nowIndex = Q.front(); Q.pop();
             propagate(nowIndex);
             if( rgeq(nodes[nowIndex].interval,target) ){
-                if(untarnished) ret = nodes[nowIndex].val;
+                if(untarnished){ ret = nodes[nowIndex].val; untarnished=false;}
                 else ret = reducer(ret,nodes[nowIndex].val);
             }
             else{ //overlapped, but not quite "in" there.
-                if( ! noOverlap( leftHalf(nodes[nowIndex]),target ) ){
-                    Q.push( nowIndex.leftidx );
+                if( ! noOverlap( leftHalf(nodes[nowIndex].interval),target ) ){
+                    Q.push(nodes[nowIndex].leftidx );
                 }
-                if( ! noOverlap( rightHalf(nodes[nowIndex]),target ) ){
-                    Q.push( nowIndex.rightidx );
+                if( ! noOverlap( rightHalf(nodes[nowIndex].interval),target ) ){
+                    Q.push( nodes[nowIndex].rightidx );
                 }
             }
         }
         return ret;
     }
+    T reduce(Interval target){
+        return reduce(target,currentCheckpoint);
+    }
 
     T getValue(size_t nodeNum){
-        return reduce({nodeNum.nodeNum});
+        return reduce({nodeNum,nodeNum});
     }
 
     void updateValue(size_t NodeNum, const T& value){ // can't this be a part of updateInterval...?
@@ -215,7 +229,7 @@ class StetSegTree{
         }
     }
 
-    void updateInterval(Interval target, const operationIDType& op){
+    void updateInterval(Interval target, const OperationIDType& op){
         std::queue<size_t> Q; Q.push( getRootIndex() );
         while(!Q.empty()){
             size_t nowIndex = Q.front(); Q.pop();
@@ -247,18 +261,41 @@ class StetSegTree{
         checkpoints[checkpointName] = &nodes[nodes.size()-1];
         
         nodes.back().version = currentCheckpoint;
+        nodes.back().parent = nodes.size()-1; //itself
     }
 
     ref operator[](size_t nodeNum){
         return ref([this,nodeNum](){return getValue(nodeNum);},
                    [this,nodeNum](const T& value){
-                        size_t nodeIndex = nodeNumToNodeIndex(nodeNum);
-                        return updateValue(nodeIndex,value);
+                        updateValue(nodeNum,value);
                    }
                 );
     }
 
 }; // template class StetSegTree
+
+
+template<
+    size_t _treeSize,
+    typename T,
+    typename ReducerType
+>
+auto makeSegTree(const vector<T>& _V, const ReducerType& _reducer, const T& _defaultValue = T() ){
+    using defaultOpId = size_t;
+    auto defaultOperator = [](Interval,T,defaultOpId){return defaultOpId();};
+    auto defaultComposer = [](defaultOpId,defaultOpId){return defaultOpId();};
+    using defaultOperatorType = decltype(defaultOperator);
+    using defaultComposerType = decltype(defaultComposer);
+    return StetSegTree<
+            T, 
+            ReducerType, 
+            defaultOpId, 
+            defaultOperatorType, 
+            defaultComposerType,
+            size_t //chekcpointType
+        >
+        (_V, _treeSize, _defaultValue, _reducer, defaultOperator, defaultComposer, 0);
+}
 
 
 }//namespace StetAlgo
