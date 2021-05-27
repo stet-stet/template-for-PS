@@ -82,6 +82,7 @@ class StetSegTree{
     size_t treeSize;
     // LAZINESS
     // Interval, T, OperationIDType -> T
+    OperationIDType defaultOpID;
     OperationType operation;
     // OperationIDType, OperationIDType -> OperationIDType
     OperationComposerType composer;
@@ -93,11 +94,13 @@ class StetSegTree{
 public:
     StetSegTree(const vector<T>& _V, size_t _treeSize, size_t defaultValue,
                 const ReducerType& _reducer,
+                const OperationIDType& _defaultOpID,
                 const OperationType& _operation,
                 const OperationComposerType& _composer,
                 const CheckpointType& _initCheckpoint)
         : treeSize{powerOfTwoGreaterOrEqualTo(_treeSize)},
           reducer{_reducer},
+          defaultOpID{_defaultOpID},
           operation{_operation},
           composer{_composer},
           currentCheckpoint{_initCheckpoint}
@@ -140,12 +143,12 @@ public:
 
     void propagate(size_t NodeIndex){
         Node& x = nodes[NodeIndex];
-        if( OperationIDType() == x.pending ) return;
+        if( defaultOpID == x.pending ) return;
         x.val = operation(x.interval, x.val, x.pending);
-        if( x.interval.first == x.interval.second ) return;
+        if( x.interval.first == x.interval.second ){ x.pending = defaultOpID; return;}
         nodes[ getRight(NodeIndex) ].pending = composer(x.pending, nodes[ getRight(NodeIndex) ].pending);
         nodes[ getLeft(NodeIndex) ].pending = composer(x.pending, nodes[ getLeft(NodeIndex) ].pending);
-        x.pending = OperationIDType();
+        x.pending = defaultOpID;
     }
 
     size_t getLeft(size_t NodeIndex){
@@ -239,14 +242,11 @@ public:
             }
             else{ //overlapped, but not quite "in" there.
                 nodes[nowIndex].val = operation(
-                        intersection(leftHalf(nodes[nowIndex]), target),
-                        nodes[nowIndex].val,
-                        op
-                        );
-                if( ! noOverlap( leftHalf(nodes[nowIndex]),target ) ){
+                        intersection(nodes[nowIndex].interval, target), nodes[nowIndex].val, op);
+                if( ! noOverlap( leftHalf(nodes[nowIndex].interval),target ) ){
                     Q.push( getLeft(nowIndex) );
                 }
-                if( ! noOverlap( rightHalf(nodes[nowIndex]),target) ){
+                if( ! noOverlap( rightHalf(nodes[nowIndex].interval),target) ){
                     Q.push( getRight(nowIndex) );
                 }
             }
@@ -281,22 +281,48 @@ template<
     typename ReducerType
 >
 auto makeSegTree(const vector<T>& _V, const ReducerType& _reducer, const T& _defaultValue = T() ){
-    using defaultOpId = size_t;
-    auto defaultOperator = [](Interval,T,defaultOpId){return defaultOpId();};
-    auto defaultComposer = [](defaultOpId,defaultOpId){return defaultOpId();};
+    using defaultOpIDType = size_t;
+    size_t defaultOpID = 0;
+    auto defaultOperator = [](Interval,T,defaultOpIDType){return defaultOpIDType();};
+    auto defaultComposer = [](defaultOpIDType,defaultOpIDType){return defaultOpIDType();};
     using defaultOperatorType = decltype(defaultOperator);
     using defaultComposerType = decltype(defaultComposer);
     return StetSegTree<
             T, 
             ReducerType, 
-            defaultOpId, 
+            defaultOpIDType, 
             defaultOperatorType, 
             defaultComposerType,
             size_t //chekcpointType
         >
-        (_V, _treeSize, _defaultValue, _reducer, defaultOperator, defaultComposer, 0);
+        (_V, _treeSize, _defaultValue, _reducer, defaultOpID, defaultOperator, defaultComposer, 0);
 }
 
+template<
+    size_t _treeSize,
+    typename T,
+    typename ReducerType,
+    typename OperationIDType,
+    typename OperatorType,
+    typename ComposerType
+>
+auto makeLazyPropSegTree(const vector<T>& _V, 
+                 const ReducerType& _reducer, 
+                 const OperationIDType& _defaultOpID,
+                 const OperatorType& _operator,
+                 const ComposerType& _composer,
+                 const T& _defaultValue = T() )
+{
+    return StetSegTree<
+            T,
+            ReducerType,
+            OperationIDType,
+            OperatorType,
+            ComposerType,
+            size_t
+        >
+        (_V, _treeSize, _defaultValue, _reducer, _defaultOpID, _operator, _composer, 0);
+}
 
 }//namespace StetAlgo
 

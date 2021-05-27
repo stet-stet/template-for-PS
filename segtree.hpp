@@ -9,15 +9,15 @@ namespace StetAlgo{
 
 constexpr size_t powerOfTwoGreaterOrEqualTo(size_t N){
     N--;
-    size_t ret=1;
+    size_t ret=0;
     while(N!=0){
         N/=2; ++ret;
     }
-    return ret;
+    return 1<<ret;
 }
 
 //TODO: make a factory function for this class.
-template<typename T,size_t N,typename Reducer>
+template<typename T,typename Reducer>
 class SegTree{
     /*
 Class Invariables:
@@ -25,7 +25,7 @@ Class Invariables:
        */
     using Interval = std::pair<size_t,size_t>;
 
-    constexpr static size_t arraysize = powerOfTwoGreaterOrEqualTo(N);
+    size_t arraysize;
     std::vector<T> container;
     Reducer reducer;
     T fallbackValue;
@@ -47,12 +47,22 @@ Class Invariables:
     };
     T _reduceInterval(size_t l,size_t r){
         //l,r are **container indices**, unlike all other functions here.
+        T ret;
+        bool untarnished = true;
         if(l==r) return container[l];
         else if(l>r) return fallbackValue;
-        T ret = fallbackValue;
-        if(l%2==1) ret = reducer(ret,container[l++]);
-        if(r%2==0) ret = reducer(ret,container[r--]);
-        return reducer(ret,_reduceInterval(l/2,r/2));
+        while(l<=r){
+            if(l%2==1){
+                if(untarnished) {ret = container[l++]; untarnished=false;}
+                else ret = reducer(ret,container[l++]);
+            }
+            if(r%2==0){
+                if(untarnished) {ret = container[r--]; untarnished=false;}
+                else ret = reducer(ret,container[r--]);
+            }
+            l/=2;r/=2;
+        }
+        return ret;
     }
 public:
     // TODO: make the compiler spew "appropriate" compile-time errors if C is not:
@@ -60,13 +70,14 @@ public:
     //  2. an iterable
     // TODO: make the compiler spew "appropriate" compile-time errors if reducer does not
     //  take two Ts and returns another T.
-    template<typename C> 
-    SegTree(const C& _container,Reducer _reducer, T _fallback)
-     : container(2*arraysize), reducer {_reducer}, fallbackValue{_fallback}
+    SegTree(const vector<T>& _container,Reducer _reducer, size_t N, T _fallback=T())
+     : container(2*powerOfTwoGreaterOrEqualTo(N)), reducer {_reducer}, fallbackValue{_fallback}
     {
+        arraysize = powerOfTwoGreaterOrEqualTo(N);
         size_t i=0;
-        for(auto x: _container){
-            container[i+arraysize] = x; ++i;
+        for(size_t i=0;i<arraysize;++i){
+            if( i < _container.size()) container[i+arraysize] = _container[i];
+            else container[i+arraysize] = fallbackValue;
         }
         for(size_t i=arraysize-1;i>0;--i){
             container[i] = reducer(container[2*i],container[2*i+1]);
@@ -97,6 +108,11 @@ public:
                 );
     }
 };
+
+template<size_t N, typename T, typename Reducer>
+auto makeSegTree(const vector<T>& _V, const Reducer& reducer, const T& _fallbackVal = T()){
+    return SegTree<T,Reducer>(_V, reducer, N, _fallbackVal);
+}
 
 }
 

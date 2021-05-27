@@ -1,4 +1,4 @@
-#include"stetsegtree.hpp"
+#include"segtree.hpp"
 #include<iostream>
 using namespace StetAlgo;
 using namespace std;
