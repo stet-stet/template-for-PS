@@ -51,6 +51,7 @@ template<
     typename CheckpointType
     >
 class StetSegTree{
+    private:
     class ref{
         std::function<T()> getValue;
         std::function<void(const T&)> updateValue;
@@ -75,8 +76,45 @@ class StetSegTree{
         {}
     }; //struct Node
 
+    class ConstTreeIterator{
+        static constexpr size_t NONE = 1ll<<63;
+        size_t nodeNum;
+        const vector<Node>& nodes;
+        std::function<void(size_t)> onNodeChange; //always called upon change in nodeNum;(except when NONE)
+        public:
+        constTreeIterator(size_t _nodeNum, 
+                const vector<Node>& _nodes, 
+                std::function<void(size_t)> _onNodeChange)
+            : nodeNum{_nodeNum}, nodes{_nodes}, onNodechange{_onNodeChange}
+        {
+            //this will only be initialized with a root node (whichever it may be)
+            onNodeChange(nodeNum);
+        }
+        T operator*(){ return nodes[nodeNum].val; } 
+        void goLeft(){
+            if(nodeNum == NONE || nodes[nodeNum].interval.first == nodes[nodeNum].interval.second) {
+                nodeNum = NONE; return;
+            }
+            nodeNum = nodes[nodeNum].leftidx;
+            onNodeChange(nodeNum);
+        }
+        void goRight(){
+            if(nodeNum == NONE || nodes[nodeNum].interval.first == nodes[nodeNum].interval.second){
+                nodeNum = NONE; return;
+            }
+            nodeNum = nodes[nodeNum].rightidx;
+            onNodeChange(nodeNum);
+        }
+        bool operator==(const ConstTreeIterator& other){
+            return nodeNum==other.nodeNum;
+        }
+        bool operator!=(const ConstTreeIterator& other){
+            return nodeNum!=other.nodeNum;
+        }
+    };
     // variables
-
+    constexpr static size_t NONE = 1ll<<63; // no node
+    public:
     // VANILLA
     ReducerType reducer;
     size_t treeSize;
@@ -255,13 +293,18 @@ public:
 
     void makeCheckpoint(CheckpointType checkpointName){
         size_t oldRootIndex = getRootIndex(); propagate(oldRootIndex);
-        nodes.push_back(nodes[oldRootIndex]);
+        if(checkpoints.count(checkpointName) >= 1){
+            currentCheckpoint = checkpointName;
+        }
+        else{
+            nodes.push_back(nodes[oldRootIndex]);
+            nodes.back().version = currentCheckpoint;
+            nodes.back().parent = nodes.size()-1; //itself
 
-        currentCheckpoint = checkpointName;
-        checkpoints[checkpointName] = &nodes[nodes.size()-1];
+            currentCheckpoint = checkpointName;
+            checkpoints[checkpointName] = &nodes[nodes.size()-1];
         
-        nodes.back().version = currentCheckpoint;
-        nodes.back().parent = nodes.size()-1; //itself
+        }
     }
 
     ref operator[](size_t nodeNum){
@@ -272,6 +315,25 @@ public:
                 );
     }
 
+    ConstTreeIterator begin(CheckpointType checkpointName){
+        return ConstTreeIterator(checkpoints[checkpointName], nodes, [](size_t idx){
+                    propagate(idx);
+                });
+    }
+
+    ConstTreeIterator begin(){
+        return begin(currentCheckpoint);
+    }
+
+    ConstTreeIterator end(CheckpointType checkpointName){
+        return ConstTreeIterator(NONE, nodes, [](size_t idx){
+                    propagate(idx);
+                });
+    }
+
+    ConstTreeIterator end(){
+        return end(currentCheckpoint);
+    }
 }; // template class StetSegTree
 
 
@@ -322,6 +384,35 @@ auto makeLazyPropSegTree(const vector<T>& _V,
             size_t
         >
         (_V, _treeSize, _defaultValue, _reducer, _defaultOpID, _operator, _composer, 0);
+}
+
+template<
+    size_t _treeSize,
+    typename T,
+    typename ReducerType,
+    typename CheckpointType
+>
+auto makePersistentSegTree(const vector<T>& _V,
+                const ReducerType& _reducer,
+                const CheckpointType& _initCheckpoint,
+                const T& _defaultValue = T() )
+{
+     using defaultOpIDType = size_t;
+    size_t defaultOpID = 0;
+   auto defaultOperator = [](Interval,T,defaultOpIDType){return defaultOpIDType();};
+    auto defaultComposer = [](defaultOpIDType,defaultOpIDType){return defaultOpIDType();};
+    using defaultOperatorType = decltype(defaultOperator);
+    using defaultComposerType = decltype(defaultComposer);
+    return StetSegTree<
+            T, 
+            ReducerType, 
+            defaultOpIDType, 
+            defaultOperatorType, 
+            defaultComposerType,
+            CheckpointType //chekcpointType
+        >
+        (_V, _treeSize, _defaultValue, _reducer, defaultOpID, defaultOperator, defaultComposer, _initCheckpoint);
+
 }
 
 }//namespace StetAlgo
