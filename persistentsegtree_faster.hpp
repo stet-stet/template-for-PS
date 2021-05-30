@@ -1,8 +1,7 @@
-#ifndef STETSEGBETTER_H_
-#define STETSEGBETTER_H_
+#ifndef PERSISTENTSEGTREE_FASTER_H_
+#define PERSISTENTSEGTREE_FASTER_H_
 
 #include<vector>
-#include<memory>
 #include<queue>
 #include<stack>
 #include<unordered_map>
@@ -62,8 +61,8 @@ class PersistentSegTree{
     struct Node{
         T val;
         CheckpointType version;
-        std::shared_ptr<Node> left = nullptr;
-        std::shared_ptr<Node> right = nullptr;
+        Node* left = nullptr;
+        Node* right = nullptr;
         bool terminal=false;
         void print(){
             cout << "val: " << val <<endl;
@@ -76,7 +75,7 @@ class PersistentSegTree{
     
     ReducerType reducer;
     CheckpointType currentCheckpoint;
-    std::unordered_map<CheckpointType, std::shared_ptr<Node> > checkpoints;
+    std::unordered_map<CheckpointType, Node* > checkpoints;
 
     public:
     PersistentSegTree(const std::vector<T>& _container, 
@@ -86,12 +85,12 @@ class PersistentSegTree{
         : treeSize(powerOfTwoGreaterOrEqualTo(N)),
           reducer{_reducer}, currentCheckpoint{_currentCheckpoint} 
     {
-        checkpoints[currentCheckpoint] = std::make_shared<Node>();
+        checkpoints[currentCheckpoint] = new Node;
         std::queue<Interval> it; it.push({0,treeSize-1});
-        std::queue<std::shared_ptr<Node> > Q; Q.push( checkpoints[currentCheckpoint] );
-        std::stack<std::shared_ptr<Node> > S;
+        std::queue<Node* > Q; Q.push( checkpoints[currentCheckpoint] );
+        std::stack<Node* > S;
         while(!Q.empty()){
-            std::shared_ptr<Node> nowNode = Q.front(); Q.pop();
+            Node* nowNode = Q.front(); Q.pop();
             Interval nowInterval = it.front(); it.pop();
 
             nowNode->version = currentCheckpoint;
@@ -107,30 +106,30 @@ class PersistentSegTree{
             else{
                 S.push(nowNode); // val, later on.
                 nowNode->terminal = false;
-                nowNode->left = std::make_shared<Node>();
-                nowNode->right = std::make_shared<Node>();
+                nowNode->left = new Node();
+                nowNode->right = new Node();
                 Q.push(nowNode->left); Q.push(nowNode->right);
                 it.push(leftHalf(nowInterval)); it.push(rightHalf(nowInterval));
             }
         }
         while(!S.empty()){
-            std::shared_ptr<Node> nowNode = S.top(); S.pop();
+            Node* nowNode = S.top(); S.pop();
             nowNode->val = reducer(nowNode->left->val,nowNode->right->val);
         }
     }
     
-    void makeNewLeft(std::shared_ptr<Node> node){
-        node->left = std::make_shared<Node>( *(node->left) );
+    void makeNewLeft(Node* node){
+        node->left = new Node( *(node->left) );
         node->left->version = node->version;
     }
-    void makeNewRight(std::shared_ptr<Node> node){
-        node->right = std::make_shared<Node>( *(node->right) );
+    void makeNewRight(Node* node){
+        node->right = new Node( *(node->right) );
         node->right->version = node->version;
     }
     void update(indexType position, const T& value){
         Interval now = {0,treeSize-1};
-        std::shared_ptr<Node> nowNode = checkpoints[currentCheckpoint];
-        std::stack< std::shared_ptr<Node> > S; 
+        Node* nowNode = checkpoints[currentCheckpoint];
+        std::stack< Node* > S; 
         while( ! nowNode->terminal ){
             S.push(nowNode);
             if( position <= (now.first + now.second) / 2){
@@ -155,7 +154,7 @@ class PersistentSegTree{
     }
 
     T reduce(Interval target, CheckpointType chk){
-        std::queue<std::shared_ptr<Node> > Q; Q.push( checkpoints[chk] );
+        std::queue<Node* > Q; Q.push( checkpoints[chk] );
         std::queue<Interval> it; it.push({0,treeSize-1});
         bool untarnished = true;
         T ret;
@@ -187,7 +186,7 @@ class PersistentSegTree{
         }
         else{
             auto oldRoot = checkpoints[currentCheckpoint];
-            checkpoints[checkpointName] = std::make_shared<Node>( *oldRoot );
+            checkpoints[checkpointName] = new Node( *oldRoot );
             checkpoints[checkpointName]->version = checkpointName;
             currentCheckpoint = checkpointName;
         }
