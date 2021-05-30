@@ -77,39 +77,38 @@ class StetSegTree{
     }; //struct Node
 
     class ConstTreeIterator{
-        static constexpr size_t NONE = 1ll<<63;
         size_t nodeNum;
-        const vector<Node>& nodes;
+        vector<Node> *nodes;
         std::function<void(size_t)> onNodeChange; //always called upon change in nodeNum;(except when NONE)
         public:
-        constTreeIterator(size_t _nodeNum, 
-                const vector<Node>& _nodes, 
-                std::function<void(size_t)> _onNodeChange)
-            : nodeNum{_nodeNum}, nodes{_nodes}, onNodechange{_onNodeChange}
+        ConstTreeIterator(size_t _nodeNum,
+                vector<Node> *_nodes,
+                const std::function<void(size_t)>& _onNodeChange)
+            : nodeNum{_nodeNum}, nodes{_nodes}, onNodeChange{_onNodeChange}
         {
             //this will only be initialized with a root node (whichever it may be)
             onNodeChange(nodeNum);
         }
-        T operator*(){ return nodes[nodeNum].val; } 
-        void goLeft(){
-            if(nodeNum == NONE || nodes[nodeNum].interval.first == nodes[nodeNum].interval.second) {
-                nodeNum = NONE; return;
-            }
-            nodeNum = nodes[nodeNum].leftidx;
-            onNodeChange(nodeNum);
+        T operator*(){ return (*nodes)[nodeNum].val; } 
+        bool isTerminal(){ return (*nodes)[nodeNum].interval.first == (*nodes)[nodeNum].interval.second; }
+        Interval getInterval(){ return (*nodes)[nodeNum].interval;}
+        ConstTreeIterator left(){
+            return ConstTreeIterator( (*nodes)[nodeNum].leftidx, nodes, onNodeChange );
         }
-        void goRight(){
-            if(nodeNum == NONE || nodes[nodeNum].interval.first == nodes[nodeNum].interval.second){
-                nodeNum = NONE; return;
-            }
-            nodeNum = nodes[nodeNum].rightidx;
-            onNodeChange(nodeNum);
+        ConstTreeIterator right(){
+            return ConstTreeIterator( (*nodes)[nodeNum].rightidx, nodes, onNodeChange);
         }
         bool operator==(const ConstTreeIterator& other){
             return nodeNum==other.nodeNum;
         }
         bool operator!=(const ConstTreeIterator& other){
             return nodeNum!=other.nodeNum;
+        }
+        void print() const{
+            cout << "node " << nodeNum << endl;
+            cout << "left: "<< (*nodes)[nodeNum].leftidx << "/right: " << (*nodes)[nodeNum].rightidx << endl;
+            cout << "interval: {" << (*nodes)[nodeNum].interval.first << " " << (*nodes)[nodeNum].interval.second<<endl;
+            cout << "value: " << (*nodes)[nodeNum].val << endl;
         }
     };
     // variables
@@ -126,7 +125,7 @@ class StetSegTree{
     OperationComposerType composer;
     // PERSISTENCY
     vector<Node> nodes;
-    std::map<CheckpointType,Node*> checkpoints;
+    std::map<CheckpointType,size_t> checkpoints;
     CheckpointType currentCheckpoint;
 
 public:
@@ -148,7 +147,7 @@ public:
         std::queue<size_t> Q;
 
         nodes.emplace_back(interval, T(), 0, currentCheckpoint); Q.push(0);
-        checkpoints[currentCheckpoint] = &nodes[0];
+        checkpoints[currentCheckpoint] = 0;
         while(!Q.empty()){
             size_t b = Q.front(); Q.pop();
             if(nodes[b].interval.first == nodes[b].interval.second) continue;
@@ -173,43 +172,39 @@ public:
         }
     }//Constructor
     size_t getRootIndex(CheckpointType chk){
-        return checkpoints[chk]->parent; // parent of root is itself
+        return nodes[checkpoints[chk]].parent; // parent of root is itself
     }
     size_t getRootIndex(){
-        return checkpoints[currentCheckpoint]->parent;
+        return getRootIndex(currentCheckpoint);
     }
 
     void propagate(size_t NodeIndex){
-        Node& x = nodes[NodeIndex];
-        if( defaultOpID == x.pending ) return;
+        Node& x = nodes[NodeIndex];     
+        if(x.pending == defaultOpID) return;
         x.val = operation(x.interval, x.val, x.pending);
         if( x.interval.first == x.interval.second ){ x.pending = defaultOpID; return;}
-        nodes[ getRight(NodeIndex) ].pending = composer(x.pending, nodes[ getRight(NodeIndex) ].pending);
-        nodes[ getLeft(NodeIndex) ].pending = composer(x.pending, nodes[ getLeft(NodeIndex) ].pending);
+        nodes[ nodes[NodeIndex].rightidx ].pending = 
+            composer(x.pending, nodes[ nodes[NodeIndex].rightidx ].pending);
+        nodes[ nodes[NodeIndex].leftidx ].pending = 
+            composer(x.pending, nodes[ nodes[NodeIndex].leftidx ].pending);
         x.pending = defaultOpID;
     }
 
-    size_t getLeft(size_t NodeIndex){
-        if(nodes[NodeIndex].version == nodes[ nodes[NodeIndex].leftidx ].version){
-            return nodes[NodeIndex].leftidx;
-        }
-        else{
-            propagate(NodeIndex);
-            nodes.push_back( nodes[ nodes[NodeIndex].leftidx ]);
-            nodes.back().version = currentCheckpoint;
-            return nodes.size()-1;
-        }
+    void getNewLeft(size_t NodeIndex){
+        //only call after you've fiddled with pending val
+        propagate(nodes[NodeIndex].leftidx);
+        nodes.push_back( nodes[ nodes[NodeIndex].leftidx ]);
+        nodes[NodeIndex].leftidx = nodes.size()-1;
+        nodes.back().version = nodes[NodeIndex].version;
+        nodes.back().parent = NodeIndex;
     }
-    size_t getRight(size_t NodeIndex){
-        if(nodes[NodeIndex].version == nodes[ nodes[NodeIndex].rightidx ].version){
-            return nodes[NodeIndex].rightidx;
-        }
-        else{
-            propagate(NodeIndex);
-            nodes.push_back( nodes[ nodes[NodeIndex].rightidx ]);
-            nodes.back().version = currentCheckpoint;
-            return nodes.size()-1;
-        }
+    void getNewRight(size_t NodeIndex){
+        //only call after you've fiddled with pending val
+        propagate(nodes[NodeIndex].rightidx);
+        nodes.push_back( nodes[ nodes[NodeIndex].rightidx ]);
+        nodes[NodeIndex].rightidx = nodes.size()-1;
+        nodes.back().version = nodes[NodeIndex].version;
+        nodes.back().parent = NodeIndex;
     }
 
 
@@ -217,8 +212,11 @@ public:
         std::queue<size_t> Q; Q.push( getRootIndex(chk) );
         bool untarnished = true;
         T ret;
-        while(!Q.empty()){
+        while(!Q.empty())
+        {
             size_t nowIndex = Q.front(); Q.pop();
+            //cout << "{"<<nodes[nowIndex].interval.first << ", "<< nodes[nowIndex].interval.second << "}";
+//            cout << nowIndex << "in reduce" << endl;
             propagate(nowIndex);
             if( rgeq(nodes[nowIndex].interval,target) ){
                 if(untarnished){ ret = nodes[nowIndex].val; untarnished=false;}
@@ -226,7 +224,7 @@ public:
             }
             else{ //overlapped, but not quite "in" there.
                 if( ! noOverlap( leftHalf(nodes[nowIndex].interval),target ) ){
-                    Q.push(nodes[nowIndex].leftidx );
+                    Q.push( nodes[nowIndex].leftidx );
                 }
                 if( ! noOverlap( rightHalf(nodes[nowIndex].interval),target ) ){
                     Q.push( nodes[nowIndex].rightidx );
@@ -249,15 +247,21 @@ public:
         while(nodes[nowIndex].interval != target){
             propagate(nowIndex);
             if(rgeq(target,leftHalf(nodes[nowIndex].interval)) ){
+                if(nodes[nowIndex].version != nodes[nodes[nowIndex].leftidx].version)
+                   getNewLeft(nowIndex);
                 nowIndex = nodes[nowIndex].leftidx;
             }
             else if(rgeq(target,rightHalf(nodes[nowIndex].interval))){
+                if(nodes[nowIndex].version != nodes[nodes[nowIndex].rightidx].version)
+                    getNewRight(nowIndex);
                 nowIndex = nodes[nowIndex].rightidx;
             }
         }
         propagate(nowIndex);
         //now go up the chain.
         nodes[nowIndex].val = value;
+//        cout << "index in update:" << nowIndex << endl;
+//        cout << "value in update:" << value << endl;
         while(nodes[nowIndex].parent != nowIndex){
             size_t parentIndex = nodes[nowIndex].parent;
             propagate(nodes[parentIndex].rightidx);
@@ -282,27 +286,31 @@ public:
                 nodes[nowIndex].val = operation(
                         intersection(nodes[nowIndex].interval, target), nodes[nowIndex].val, op);
                 if( ! noOverlap( leftHalf(nodes[nowIndex].interval),target ) ){
-                    Q.push( getLeft(nowIndex) );
+                    if(nodes[nowIndex].version != nodes[nodes[nowIndex].leftidx].version)
+                        getNewLeft(nowIndex);
+                    Q.push( nodes[nowIndex].leftidx );
                 }
                 if( ! noOverlap( rightHalf(nodes[nowIndex].interval),target) ){
-                    Q.push( getRight(nowIndex) );
+                    if(nodes[nowIndex].version != nodes[nodes[nowIndex].rightidx].version)
+                        getNewRight(nowIndex);
+                    Q.push( nodes[nowIndex].rightidx );
                 }
             }
         }
     }
 
-    void makeCheckpoint(CheckpointType checkpointName){
+    void checkout(CheckpointType checkpointName, bool overwrite){
         size_t oldRootIndex = getRootIndex(); propagate(oldRootIndex);
-        if(checkpoints.count(checkpointName) >= 1){
+        if(checkpoints.count(checkpointName) >= 1 && overwrite == false){
             currentCheckpoint = checkpointName;
         }
         else{
             nodes.push_back(nodes[oldRootIndex]);
-            nodes.back().version = currentCheckpoint;
-            nodes.back().parent = nodes.size()-1; //itself
+            nodes[nodes.size()-1].version = checkpointName;
+            nodes[nodes.size()-1].parent = nodes.size()-1; //itself
 
             currentCheckpoint = checkpointName;
-            checkpoints[checkpointName] = &nodes[nodes.size()-1];
+            checkpoints[checkpointName] = nodes.size()-1;
         
         }
     }
@@ -316,24 +324,17 @@ public:
     }
 
     ConstTreeIterator begin(CheckpointType checkpointName){
-        return ConstTreeIterator(checkpoints[checkpointName], nodes, [](size_t idx){
-                    propagate(idx);
-                });
+        return ConstTreeIterator(
+                checkpoints[checkpointName], 
+                &nodes,
+                [this](size_t idx){ propagate(idx);} 
+                );
     }
 
     ConstTreeIterator begin(){
         return begin(currentCheckpoint);
     }
 
-    ConstTreeIterator end(CheckpointType checkpointName){
-        return ConstTreeIterator(NONE, nodes, [](size_t idx){
-                    propagate(idx);
-                });
-    }
-
-    ConstTreeIterator end(){
-        return end(currentCheckpoint);
-    }
 }; // template class StetSegTree
 
 
