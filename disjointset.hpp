@@ -24,7 +24,7 @@ public:
             return parent[a];
         }
     }
-    void add(int a,int b){
+    void connect(int a,int b){
         if(find(a)==find(b)) return;
         parent[find(b)] = find(a);
     }

@@ -12,7 +12,7 @@ int main(){
     while(m--){
         int query, a, b;
         cin >> query>>a>>b;
-        if(query==0) D.add(a,b);
+        if(query==0) D.connect(a,b);
         else cout << ( D.connected(a,b) ? "YES" : "NO" ) << '\n';
     }
 }
