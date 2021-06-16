@@ -16,7 +16,7 @@ auto makeMinHeap(){
     return std::priority_queue<T,std::vector<T>,std::greater<T> >();
 }
 
-template<typename C, typename T>
+/*template<typename C, typename T>
 auto binary_search(const C& container, const T& val){
     if( static_cast<T>(container.front()) < static_cast<T>(container.back()))
         return binary_search(container.cbegin(),container.cend(),val);
@@ -38,7 +38,7 @@ auto upper_bound(const C& container, const T& val){
         return std::upper_bound(container.cbegin(), container.cend(), val);
     else
         return std::upper_bound(container.crbegin(), container.crend(), val);
-}
+}*/
 
 template<typename PredicateType>
 size_t upper_bound(long long l, long long r, PredicateType pred){
